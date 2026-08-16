@@ -14,7 +14,7 @@ class LLMConfig:
     reasoner_model: str = ""
 
 PROVIDER_PRESETS = {
-    "deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-chat", "reasoner_model": "deepseek-reasoner"},
+    "deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "reasoner_model": "deepseek-v4-pro"},
     "qwen": {"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus", "reasoner_model": ""},
     "grok": {"base_url": "https://api.x.ai/v1", "model": "grok-4", "reasoner_model": ""},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-5-codex", "reasoner_model": ""},

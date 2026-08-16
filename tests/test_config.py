@@ -4,7 +4,7 @@ from config import load_llm_config, LLMConfig, ConfigError
 class TestLoadLLMConfig(unittest.TestCase):
     def test_deepseek_preset(self):
         c = load_llm_config({"LLM_API_KEY": "sk-1"})
-        self.assertEqual(c, LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-chat", "deepseek-reasoner"))
+        self.assertEqual(c, LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-v4-flash", "deepseek-v4-pro"))
 
     def test_qwen_preset(self):
         c = load_llm_config({"LLM_API_KEY": "sk-2", "PROVIDER": "qwen"})

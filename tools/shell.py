@@ -23,8 +23,8 @@ def make_shell_tools(gate) -> list[Tool]:
         return "\n".join(outputs).strip() or "（无输出）"
 
     def run_python(args):
-        if not gate.shell("python3"):
-            return "拒绝：执行 Python 需确认"
+        if not gate.python(args["code"]):
+            return "拒绝：代码触碰密钥/越界，或未确认执行"
         tmp = gate.sandbox_root / ".agent_tmp.py"
         tmp.write_text(args["code"], encoding="utf-8")
         try:

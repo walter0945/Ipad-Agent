@@ -32,5 +32,27 @@ class TestShell(unittest.TestCase):
             out = tool.func({"code": "print('hello from python')"})
             self.assertIn("hello from python", out)
 
+    def test_run_python_blocks_sandbox_escape(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "workspace"; root.mkdir()
+            (Path(d) / ".env").write_text("LLM_API_KEY=sk-SECRET", encoding="utf-8")
+            gate = PermissionGate(root, ("python3",), lambda m: True, lambda m: True)
+            tool = {t.name: t for t in make_shell_tools(gate)}["run_python"]
+            out = tool.func({"code": "print(open('../.env').read())"})
+            self.assertIn("拒绝", out)
+            self.assertNotIn("sk-SECRET", out)
+
+    def test_run_shell_blocks_secret_via_cat(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "workspace"; root.mkdir()
+            (Path(d) / ".env").write_text("LLM_API_KEY=sk-SECRET", encoding="utf-8")
+            gate = PermissionGate(root, ("cat",), lambda m: True, lambda m: True)
+            tool = {t.name: t for t in make_shell_tools(gate)}["run_shell"]
+            out = tool.func({"command": "cat ../.env"})
+            self.assertIn("拒绝", out)
+            self.assertNotIn("sk-SECRET", out)
+
 if __name__ == "__main__":
     unittest.main()

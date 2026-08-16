@@ -32,6 +32,29 @@ class TestGate(unittest.TestCase):
         self.assertTrue(g.shell("ls -l"))
         self.assertFalse(g.shell("rm -rf /"))
 
+    def test_shell_blocks_secret_and_escape_in_args(self):
+        # 命令头在白名单，但参数试图读密钥/越界/绝对路径 —— 必须挡住
+        g = self._gate()
+        self.assertFalse(g.shell("ls ../.env"))          # 密钥 token
+        self.assertFalse(g.shell("ls .."))               # 路径穿越
+        self.assertFalse(g.shell("ls /etc/passwd"))      # 绝对路径
+        self.assertTrue(g.shell("ls -l data"))           # 正常相对路径放行
+
+    def test_python_shows_code_in_prompt(self):
+        seen = []
+        g = self._gate(strong=lambda m: seen.append(m) or True)
+        self.assertTrue(g.python("print('hi')"))
+        self.assertTrue(seen and "print('hi')" in seen[0])   # 代码出现在确认提示里
+
+    def test_python_blocks_secret_and_escape(self):
+        g = self._gate()
+        self.assertFalse(g.python("open('../.env').read()"))
+        self.assertFalse(g.python("open('/etc/passwd')"))
+
+    def test_python_requires_allowlist(self):
+        g = PermissionGate(Path("workspace"), ("ls",), lambda m: True, lambda m: True)
+        self.assertFalse(g.python("print(1)"))           # python3 不在白名单
+
     def test_secret_files_unreadable(self):
         g = self._gate()
         for name in ("workspace/.env", "workspace/keys/id_rsa", "workspace/secret.pem",

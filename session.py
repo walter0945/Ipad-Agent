@@ -44,7 +44,20 @@ class Session:
     def maybe_compress(self, summarize: Callable[[str], str], max_tokens: int, ratio: float = 0.8) -> None:
         if self._estimate() <= ratio * max_tokens or len(self.messages) <= 8:
             return
-        head = self.messages[:len(self.messages) - 6]
+        k = len(self.messages) - 6
+        # 不能把保留窗口的起点切在孤儿 tool 消息上（其 assistant.tool_calls 被切走会导致 API 400）：
+        # 回退 k 直到它不再指向 tool 消息，即落到所属 assistant 或普通消息上。
+        while k > 0 and self.messages[k].get("role") == "tool":
+            k -= 1
+        if k <= 1:   # 回退过头，本轮没有可安全压缩的头部
+            return
+        base_system = self.messages[0]            # 原始 system（规则/skills/文件索引）必须保留
+        head = self.messages[1:k]
+        if not head:
+            return
         summary = summarize(json.dumps(head, ensure_ascii=False))
-        self.messages = [{"role": "system", "content": f"[会话历史摘要] {summary}"}] + self.messages[len(self.messages) - 6:]
+        if not summary or not summary.strip():
+            return   # 摘要失败：保留完整历史，下轮重试，绝不丢数据
+        self.messages = [base_system,
+                         {"role": "system", "content": f"[会话历史摘要] {summary}"}] + self.messages[k:]
         self.dirty = True

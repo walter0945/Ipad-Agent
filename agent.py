@@ -123,9 +123,25 @@ if __name__ == "__main__":
             pass
 
     load_dotenv()
-    cfg = load_llm_config()
 
     args = sys.argv[1:]
+
+    # --install-skill：从 GitHub 下载并安装 skill（无需 API key）
+    if "--install-skill" in args:
+        idx = args.index("--install-skill")
+        url = args[idx + 1] if idx + 1 < len(args) else ""
+        if not url:
+            print("用法：python3 agent.py --install-skill <github仓库或SKILL.md的URL>", flush=True)
+            sys.exit(1)
+        from skill_install import install_skill
+        skills_dir = Path(__file__).resolve().parent / "skills"
+        try:
+            print(install_skill(url, skills_dir), flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"安装失败：{e}", flush=True)
+        sys.exit(0)
+
+    cfg = load_llm_config()
     auto_yes = "--yes" in args or "-y" in args
     args = [a for a in args if a not in ("--yes", "-y")]
 

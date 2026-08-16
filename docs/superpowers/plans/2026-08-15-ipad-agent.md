@@ -1055,7 +1055,7 @@ def make_search_tools() -> list[Tool]:
         r = requests.get("https://html.duckduckgo.com/html/", params={"q": q}, timeout=30)
         titles = re.findall(r'class="result__a"[^>]*>(.*?)</a>', r.text)
         snippets = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', r.text)
-        return "\n".join(f"{html_to_text(t)} — {html_to_text(s)}" for t, s in zip(titles, snippets)[:8]) or "（无结果）"
+        return "\n".join(f"{html_to_text(t)} — {html_to_text(s)}" for t, s in list(zip(titles, snippets))[:8]) or "（无结果）"
 
     def read_url(args):
         r = requests.get(args["url"], timeout=30, headers={"User-Agent": "Mozilla/5.0"})

@@ -1,8 +1,8 @@
 import json
+import sys
 from pathlib import Path
 from typing import Callable
 from dotenv import load_dotenv
-from rich.console import Console
 from config import LLMConfig, load_llm_config
 from llm import LLMClient
 from permissions import PermissionGate
@@ -79,17 +79,30 @@ class Agent:
         return "（达到最大工具轮数）"
 
 
+def _prompt(text: str) -> str:
+    """提示符与读取分开：a-Shell 不保证 input(prompt) 的提示会被 flush 出来。"""
+    sys.stdout.write(text)
+    sys.stdout.flush()
+    return input()
+
+
 def _ask(prompt: str) -> bool:
-    return input(prompt).strip().lower() in ("y", "yes", "是")
+    return _prompt(prompt).strip().lower() in ("y", "yes", "是")
 
 
 if __name__ == "__main__":
-    import sys
-    sys.stdin.reconfigure(encoding="utf-8")
-    sys.stdout.reconfigure(encoding="utf-8")
+    # a-Shell 的 stdin 不是普通 fd（ios_system 经 WKWebView 桥接），reconfigure 会
+    # 重建 TextIOWrapper 并切断输入管道，导致第一次 input() 就再也收不到按键。
+    # 仅在编码确实不是 UTF-8 时才尝试（Windows 控制台），失败也不致命。
+    for _stream in (sys.stdin, sys.stdout):
+        try:
+            if (getattr(_stream, "encoding", "") or "").lower().replace("-", "") != "utf8":
+                _stream.reconfigure(encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+
     load_dotenv()
     cfg = load_llm_config()
-    console = Console()
 
     args = sys.argv[1:]
     auto_yes = "--yes" in args or "-y" in args
@@ -106,11 +119,14 @@ if __name__ == "__main__":
     agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm)
 
     if args:
-        console.print(agent.run(" ".join(args)))
+        print(agent.run(" ".join(args)), flush=True)
     else:
-        print("输入 /quit 或 /exit 退出。")
+        print("输入 /quit 或 /exit 退出。", flush=True)
         while True:
-            u = input("你 > ")
+            try:
+                u = _prompt("你 > ")
+            except EOFError:
+                break
             if u.strip().lower() in ("/quit", "/exit"):
                 break
-            console.print(agent.run(u))
+            print(agent.run(u), flush=True)

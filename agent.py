@@ -17,6 +17,7 @@ from tools.shell import make_shell_tools
 from tools.search import make_search_tools
 from tools.video import make_video_tools
 from tools.shortcuts import make_shortcuts_tools
+from tools.docx import make_docx_tools
 
 def build_system_prompt(skills: list[Skill], file_index: str = "") -> str:
     lines = ["你是一个运行在 iPad 本地沙盒里的 AI agent，帮用户处理文件、表格与信息。",
@@ -43,7 +44,8 @@ class Agent:
         self.registry = Registry()
         for t in (make_files_tools(self.gate) + make_spreadsheet_tools(self.gate)
                   + make_shell_tools(self.gate) + make_search_tools()
-                  + make_video_tools(self.gate) + make_shortcuts_tools(self.gate)):
+                  + make_video_tools(self.gate) + make_shortcuts_tools(self.gate)
+                  + make_docx_tools(self.gate)):
             self.registry.register(t)
         self.skills = load_skills(Path(__file__).resolve().parent / "skills")
         self.max_tokens = 8192

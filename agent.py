@@ -108,8 +108,36 @@ def _prompt(text: str) -> str:
     return input()
 
 
-def _ask(prompt: str) -> bool:
-    return _prompt(prompt).strip().lower() in ("y", "yes", "是")
+class Confirmer:
+    """三选项确认器（Claude Code 风格）。
+
+    1 确认本次 → 返回 True
+    2 确认所有 → 记住本会话，后续所有写/删/shell 自动放行
+    3 拒绝 → 返回 False
+    """
+
+    def __init__(self):
+        self.approve_all = False
+
+    def confirm(self, prompt: str) -> bool:
+        return self._decide(prompt)
+
+    def strong_confirm(self, prompt: str) -> bool:
+        return self._decide(prompt)
+
+    def _decide(self, prompt: str) -> bool:
+        if self.approve_all:
+            return True
+        sys.stdout.write(f"\n{prompt}\n  [1] 确认本次  [2] 确认所有(后续自动执行)  [3] 拒绝\n> ")
+        sys.stdout.flush()
+        try:
+            choice = input().strip().lower()
+        except EOFError:
+            return False
+        if choice in ("2", "all", "a", "全部", "自动"):
+            self.approve_all = True
+            return True
+        return choice in ("1", "y", "yes", "是", "ok", "确认")
 
 
 if __name__ == "__main__":
@@ -154,7 +182,9 @@ if __name__ == "__main__":
         # 单次模式（未 --yes）：默认拒绝写/删/shell，只允许读，避免在无交互键盘的环境卡在 input()
         confirm = strong_confirm = lambda m: False
     else:
-        confirm = strong_confirm = _ask
+        _confirmer = Confirmer()
+        confirm = _confirmer.confirm
+        strong_confirm = _confirmer.strong_confirm
 
     agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm,
                   persist=not bool(args))

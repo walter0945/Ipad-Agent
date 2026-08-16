@@ -4,7 +4,7 @@ from pathlib import Path
 from config import LLMConfig
 from llm import LLMResult, ToolCall
 from skills import Skill
-from agent import Agent, build_system_prompt
+from agent import Agent, build_system_prompt, Confirmer
 
 class TestBuildPrompt(unittest.TestCase):
     def test_includes_skills(self):
@@ -33,6 +33,29 @@ class TestAgent(unittest.TestCase):
             # 保存是 no-op：旧文件内容不变
             agent.session.save()
             self.assertEqual(sf.read_text(encoding="utf-8"), '{"role": "system", "content": "OLD"}\n')
+
+class TestConfirmer(unittest.TestCase):
+    def test_approve_this(self):
+        c = Confirmer()
+        with patch("builtins.input", return_value="1"):
+            self.assertTrue(c.confirm("确认写入？"))
+        self.assertFalse(c.approve_all)
+
+    def test_approve_all_then_auto(self):
+        c = Confirmer()
+        with patch("builtins.input", return_value="2"):
+            self.assertTrue(c.strong_confirm("确认删除？"))
+        self.assertTrue(c.approve_all)
+        with patch("builtins.input") as inp:
+            self.assertTrue(c.confirm("再写一次？"))
+            inp.assert_not_called()
+
+    def test_reject(self):
+        c = Confirmer()
+        with patch("builtins.input", return_value="3"):
+            self.assertFalse(c.confirm("确认写入？"))
+        self.assertFalse(c.approve_all)
+
 
 class _FakeLLM:
     def __init__(self): self.n = 0

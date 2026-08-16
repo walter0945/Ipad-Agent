@@ -89,11 +89,28 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     load_dotenv()
     cfg = load_llm_config()
-    agent = Agent(cfg, Path("workspace"), confirm=_ask, strong_confirm=_ask)
     console = Console()
-    print("输入 /quit 或 /exit 退出。")
-    while True:
-        u = input("你 > ")
-        if u.strip().lower() in ("/quit", "/exit"):
-            break
-        console.print(agent.run(u))
+
+    args = sys.argv[1:]
+    auto_yes = "--yes" in args or "-y" in args
+    args = [a for a in args if a not in ("--yes", "-y")]
+
+    if auto_yes:
+        confirm = strong_confirm = lambda m: True
+    elif args:
+        # 单次模式（未 --yes）：默认拒绝写/删/shell，只允许读，避免在无交互键盘的环境卡在 input()
+        confirm = strong_confirm = lambda m: False
+    else:
+        confirm = strong_confirm = _ask
+
+    agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm)
+
+    if args:
+        console.print(agent.run(" ".join(args)))
+    else:
+        print("输入 /quit 或 /exit 退出。")
+        while True:
+            u = input("你 > ")
+            if u.strip().lower() in ("/quit", "/exit"):
+                break
+            console.print(agent.run(u))

@@ -19,6 +19,6 @@ def load_skills(skills_dir: Path) -> list[Skill]:
         m = _FRONT.match(text)
         if not m:
             continue
-        meta = dict(re.findall(r"(\w+):\s*(.+)", m.group(1)))
+        meta = dict(re.findall(r"([\w-]+):\s*(.+)", m.group(1)))
         out.append(Skill(meta.get("name", md.parent.name), meta.get("description", ""), m.group(2).strip()))
     return out

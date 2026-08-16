@@ -1,0 +1,28 @@
+import unittest
+from config import load_llm_config, LLMConfig, ConfigError
+
+class TestLoadLLMConfig(unittest.TestCase):
+    def test_deepseek_preset(self):
+        c = load_llm_config({"LLM_API_KEY": "sk-1"})
+        self.assertEqual(c, LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-chat"))
+
+    def test_qwen_preset(self):
+        c = load_llm_config({"LLM_API_KEY": "sk-2", "PROVIDER": "qwen"})
+        self.assertEqual(c.base_url, "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        self.assertEqual(c.model, "qwen-plus")
+
+    def test_override(self):
+        c = load_llm_config({"LLM_API_KEY": "k", "LLM_BASE_URL": "http://localhost:11434/v1", "LLM_MODEL": "llama3"})
+        self.assertEqual(c.base_url, "http://localhost:11434/v1")
+        self.assertEqual(c.model, "llama3")
+
+    def test_missing_key_raises(self):
+        with self.assertRaises(ConfigError):
+            load_llm_config({})
+
+    def test_unknown_provider_without_override_raises(self):
+        with self.assertRaises(ConfigError):
+            load_llm_config({"LLM_API_KEY": "k", "PROVIDER": "nope"})
+
+if __name__ == "__main__":
+    unittest.main()

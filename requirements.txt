@@ -1,0 +1,4 @@
+requests
+openpyxl
+rich
+python-dotenv

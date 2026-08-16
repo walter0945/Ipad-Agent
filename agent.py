@@ -8,6 +8,7 @@ from llm import LLMClient
 from permissions import PermissionGate
 from session import Session
 from skills import Skill, load_skills
+from index import build_index
 from router import should_use_reasoner
 from tools import Registry
 from tools.files import make_files_tools
@@ -15,7 +16,7 @@ from tools.spreadsheet import make_spreadsheet_tools
 from tools.shell import make_shell_tools
 from tools.search import make_search_tools
 
-def build_system_prompt(skills: list[Skill]) -> str:
+def build_system_prompt(skills: list[Skill], file_index: str = "") -> str:
     lines = ["你是一个运行在 iPad 本地沙盒里的 AI agent，帮用户处理文件、表格与信息。",
              "规则：所有文件操作限沙盒目录；删除/覆盖/执行 shell 前会经用户确认；不确定就问。",
              "可用的 skills："]
@@ -25,6 +26,8 @@ def build_system_prompt(skills: list[Skill]) -> str:
         lines.append("\n各 skill 用法：")
         for s in skills:
             lines.append(f"[{s.name}]\n{s.body}")
+    if file_index:
+        lines.append(f"\n当前沙盒文件索引：\n{file_index}")
     return "\n".join(lines)
 
 class Agent:
@@ -41,10 +44,11 @@ class Agent:
         self.skills = load_skills(Path(__file__).resolve().parent / "skills")
         self.max_tokens = 8192
         self.session_path = sandbox_root / ".session.jsonl"
+        self.file_index = build_index(sandbox_root)
         if self.session_path.exists():
             self.session = Session.load(self.session_path)
         else:
-            self.session = Session(build_system_prompt(self.skills), self.session_path)
+            self.session = Session(build_system_prompt(self.skills, file_index=self.file_index), self.session_path)
 
     def _summarize(self, text: str) -> str:
         try:

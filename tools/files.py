@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from index import build_index
 from tools import Tool
 
 def _resolve(gate, p: str) -> Path:
@@ -71,6 +72,9 @@ def make_files_tools(gate) -> list[Tool]:
                          if not gate._is_secret(x))
         return "\n".join(matches[:100])
 
+    def file_index(args):
+        return build_index(gate.sandbox_root)
+
     return [
         Tool("read_file", "读文件（支持 start/end 行区间）",
              {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"}, "end": {"type": "integer"}}, "required": ["path"]}, read_file),
@@ -81,4 +85,5 @@ def make_files_tools(gate) -> list[Tool]:
         Tool("list_dir", "列出目录", {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}, list_dir),
         Tool("grep", "正则搜索文件内容", {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}, grep),
         Tool("glob", "按模式找文件", {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}, glob),
+        Tool("file_index", "列出沙盒内所有文件（排除隐藏与密钥文件）", {"type": "object", "properties": {}, "required": []}, file_index),
     ]

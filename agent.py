@@ -33,7 +33,8 @@ def build_system_prompt(skills: list[Skill], file_index: str = "") -> str:
 
 class Agent:
     def __init__(self, config: LLMConfig, sandbox_root: Path,
-                 confirm: Callable[[str], bool], strong_confirm: Callable[[str], bool]):
+                 confirm: Callable[[str], bool], strong_confirm: Callable[[str], bool],
+                 persist: bool = True):
         sandbox_root.mkdir(parents=True, exist_ok=True)
         self.config = config
         self.llm = LLMClient(config)
@@ -45,12 +46,17 @@ class Agent:
             self.registry.register(t)
         self.skills = load_skills(Path(__file__).resolve().parent / "skills")
         self.max_tokens = 8192
-        self.session_path = sandbox_root / ".session.jsonl"
+        self.session_path = sandbox_root / ".session.jsonl" if persist else None
         self.file_index = build_index(sandbox_root)
-        if self.session_path.exists():
+        if persist and self.session_path is not None and self.session_path.exists():
             self.session = Session.load(self.session_path)
         else:
             self.session = Session(build_system_prompt(self.skills, file_index=self.file_index), self.session_path)
+
+    def clear(self):
+        self.session = Session(build_system_prompt(self.skills, file_index=self.file_index), self.session_path)
+        if self.session_path is not None:
+            self.session.save()
 
     def _summarize(self, text: str) -> str:
         try:
@@ -131,12 +137,13 @@ if __name__ == "__main__":
     else:
         confirm = strong_confirm = _ask
 
-    agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm)
+    agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm,
+                  persist=not bool(args))
 
     if args:
         print(agent.run(" ".join(args)), flush=True)
     else:
-        print("输入 /quit 或 /exit 退出。", flush=True)
+        print("输入 /quit 或 /exit 退出；/clear 清空会话。", flush=True)
         while True:
             try:
                 u = _prompt("你 > ")
@@ -144,4 +151,8 @@ if __name__ == "__main__":
                 break
             if u.strip().lower() in ("/quit", "/exit"):
                 break
+            if u.strip().lower() in ("/clear", "/reset"):
+                agent.clear()
+                print("会话已清空", flush=True)
+                continue
             print(agent.run(u), flush=True)

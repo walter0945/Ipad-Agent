@@ -20,6 +20,17 @@ class TestAgent(unittest.TestCase):
         out = agent.run("写入 a.txt 内容 hi")
         self.assertIn("已写入", out)
 
+    def test_persist_false_starts_fresh(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / ".session.jsonl").write_text(
+                '{"role": "system", "content": "OLD"}\n', encoding="utf-8")
+            cfg = LLMConfig("deepseek", "http://x", "k", "m")
+            agent = Agent(cfg, root, lambda m: True, lambda m: True, persist=False)
+            self.assertTrue(all("OLD" not in m["content"] for m in agent.session.to_messages()))
+            self.assertFalse((root / ".session.jsonl").exists())
+
 class _FakeLLM:
     def __init__(self): self.n = 0
     def chat(self, messages, tools=None, model=None):

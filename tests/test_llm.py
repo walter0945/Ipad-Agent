@@ -45,5 +45,22 @@ class TestChat(unittest.TestCase):
         self.assertEqual(r.content, "ok")
         self.assertTrue(sleep.called)
 
+    def test_timeout_retries_then_succeeds(self):
+        ok = self._resp({"choices": [{"message": {"content": "ok"}}]})
+        with patch("llm.requests.post") as post:
+            post.side_effect = [requests.exceptions.Timeout(), ok]
+            with patch("llm.time.sleep") as sleep:
+                r = LLMClient(CFG).chat([{"role": "user", "content": "x"}])
+        self.assertEqual(r.content, "ok")
+        self.assertTrue(sleep.called)
+
+    def test_connection_error_retries_then_succeeds(self):
+        ok = self._resp({"choices": [{"message": {"content": "ok"}}]})
+        with patch("llm.requests.post") as post:
+            post.side_effect = [requests.exceptions.ConnectionError(), ok]
+            with patch("llm.time.sleep"):
+                r = LLMClient(CFG).chat([{"role": "user", "content": "x"}])
+        self.assertEqual(r.content, "ok")
+
 if __name__ == "__main__":
     unittest.main()

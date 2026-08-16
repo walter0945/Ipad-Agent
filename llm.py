@@ -56,6 +56,7 @@ class LLMClient:
                 raise
             except requests.exceptions.SSLError:
                 # a-Shell 直连时 SSL 证书链可能缺失，回退到 certifi
+                # 注意：SSLError 是 ConnectionError 的子类，此分支必须排在网络重试分支之前
                 import certifi
                 resp = requests.post(url, headers=headers, json=payload,
                                      timeout=self.timeout, verify=certifi.where())
@@ -68,4 +69,9 @@ class LLMClient:
                                   json.loads(tc["function"].get("arguments") or "{}"))
                          for tc in msg.get("tool_calls", [])]
                 return LLMResult(msg.get("content"), calls)
-        raise LLMRateLimitError("重试耗尽：持续 429/5xx")
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                # iPad 蜂窝网络下最常见的失败：超时/连接中断，指数退避重试
+                last_exc = e
+                time.sleep(2 ** attempt)
+                continue
+        raise LLMRateLimitError(f"重试耗尽：{last_exc}")

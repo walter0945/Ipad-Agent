@@ -16,6 +16,13 @@ class TestRouter(unittest.TestCase):
 
     def test_english_hint(self):
         self.assertTrue(should_use_reasoner("analyze this data"))
+        self.assertTrue(should_use_reasoner("make a plan for launch"))
+        self.assertTrue(should_use_reasoner("design a schema"))
+
+    def test_english_substring_no_false_trigger(self):
+        # "plan" 不应命中 "airplane"，"reason" 不应命中 "seasoning"
+        self.assertFalse(should_use_reasoner("book an airplane ticket"))
+        self.assertFalse(should_use_reasoner("add more seasoning"))
 
 
 if __name__ == "__main__":

@@ -29,6 +29,21 @@ class TestVideoTools(unittest.TestCase):
             out = tool.func({"storyboard": "not json", "output": "x.mp4"})
             self.assertIn("JSON", out)
 
+    def test_cjk_font_in_candidates(self):
+        from tools.video import _FONT_CANDIDATES
+        joined = " ".join(_FONT_CANDIDATES).lower()
+        self.assertTrue(any(k in joined for k in ("msyh", "pingfang", "noto", "simhei", "heiti")),
+                        "候选字体里应包含至少一个能渲染中文的字体")
+
+    def test_load_font_explicit_path(self):
+        import os
+        from tools.video import _load_font
+        p = "C:/Windows/Fonts/arial.ttf"
+        if not os.path.exists(p):
+            self.skipTest("本机无该测试字体")
+        f = _load_font(24, p)
+        self.assertEqual(getattr(f, "path", None), p)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -76,6 +76,22 @@ def make_spreadsheet_tools(gate) -> list[Tool]:
         wb.save(p)
         return f"已追加 {len(args['row'])} 列到 {p.name}"
 
+    def sheet_delete(args):
+        p = _resolve(gate, args["path"])
+        if not p.exists():
+            return f"文件不存在：{args['path']}"
+        if not gate.overwrite(p):
+            return "拒绝：未确认覆盖"
+        wb = load_workbook(p)
+        name = args["sheet"]
+        if name not in wb.sheetnames:
+            return f"工作表不存在：{name}（现有：{', '.join(wb.sheetnames)}）"
+        if len(wb.sheetnames) == 1:
+            return "不能删除唯一的工作表"
+        wb.remove(wb[name])
+        wb.save(p)
+        return f"已删除工作表 {name}，剩余：{', '.join(wb.sheetnames)}"
+
     def sheet_summary(args):
         p = _resolve(gate, args["path"])
         if not gate.read(p): return "拒绝"
@@ -107,4 +123,6 @@ def make_spreadsheet_tools(gate) -> list[Tool]:
              {"type": "object", "properties": {"path": {"type": "string"}, "sheet": {"type": "string"}, "row": {"type": "array", "items": {"type": "string"}}}, "required": ["path", "row"]}, sheet_add_row),
         Tool("sheet_summary", "表格结构概览（行数/列数/工作表）",
              {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}, sheet_summary),
+        Tool("sheet_delete", "删除工作表（至少保留一个）",
+             {"type": "object", "properties": {"path": {"type": "string"}, "sheet": {"type": "string"}}, "required": ["path", "sheet"]}, sheet_delete),
     ]

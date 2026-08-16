@@ -57,5 +57,30 @@ class TestSheetTools(unittest.TestCase):
             self.assertIn("ok.xlsx", out)
             self.assertNotIn("credentials", out)
 
+    def test_sheet_delete(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            from openpyxl import Workbook
+            wb = Workbook()
+            wb.active.title = "A"
+            wb.create_sheet("B")
+            wb.save(root / "book.xlsx")
+            t = _tools(root)
+            out = t["sheet_delete"].func({"path": "book.xlsx", "sheet": "B"})
+            self.assertIn("已删除", out)
+            from openpyxl import load_workbook
+            self.assertEqual(load_workbook(root / "book.xlsx").sheetnames, ["A"])
+
+    def test_sheet_delete_last_denied(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            from openpyxl import Workbook
+            wb = Workbook()
+            wb.active.title = "Only"
+            wb.save(root / "book.xlsx")
+            t = _tools(root)
+            out = t["sheet_delete"].func({"path": "book.xlsx", "sheet": "Only"})
+            self.assertIn("唯一", out)
+
 if __name__ == "__main__":
     unittest.main()

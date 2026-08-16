@@ -1,3 +1,6 @@
+# 核心
 requests
 openpyxl
 python-dotenv
+# 视频（v1.1；a-Shell 首次安装 Pillow 需现场编译，约几分钟）
+Pillow

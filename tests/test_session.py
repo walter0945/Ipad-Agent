@@ -70,6 +70,28 @@ class TestSession(unittest.TestCase):
         self.assertNotIn("tool_calls", msgs[2])
         self.assertNotIn("tool_call_id", msgs[1])
 
+    def test_sanitize_drops_orphan_tools(self):
+        # 模拟历史遗留的脏会话：tool 消息的 tool_call_id 对不上前面 assistant 的 tool_calls
+        s = Session("sys")
+        s.add("assistant", "", tool_calls=[{"id": "a", "type": "function",
+                                            "function": {"name": "x", "arguments": "{}"}}])
+        s.add("tool", "合法结果", tool_call_id="a")
+        s.add("tool", "孤儿", tool_call_id="b")   # b 不属于任何 assistant.tool_calls
+        msgs = s.to_messages()
+        roles = [(m.get("role"), m.get("tool_call_id")) for m in msgs]
+        self.assertIn(("tool", "a"), roles)
+        self.assertNotIn(("tool", "b"), roles)
+
+    def test_sanitize_keeps_multi_tool_turn(self):
+        s = Session("sys")
+        s.add("assistant", "", tool_calls=[
+            {"id": "a", "type": "function", "function": {"name": "x", "arguments": "{}"}},
+            {"id": "b", "type": "function", "function": {"name": "y", "arguments": "{}"}},
+        ])
+        s.add("tool", "ra", tool_call_id="a")
+        s.add("tool", "rb", tool_call_id="b")
+        self.assertEqual(len([m for m in s.to_messages() if m.get("role") == "tool"]), 2)
+
     def test_roundtrip_with_tool_fields(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "s.jsonl"

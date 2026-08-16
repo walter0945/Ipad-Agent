@@ -17,7 +17,29 @@ class Session:
         self.messages.append(msg)
         self.dirty = True
 
+    def sanitize(self) -> None:
+        """丢弃孤儿 tool 消息：tool_call_id 不在前一个 assistant 的 tool_calls 里。
+
+        这是发送前的最后一道防线——无论压缩/加载历史/边界情况如何，
+        都能保证发给 API 的消息序列合法，避免 400 (missing tool_call_id)。
+        """
+        valid_ids: set = set()
+        cleaned: list = []
+        for m in self.messages:
+            role = m.get("role")
+            if role == "assistant":
+                valid_ids = {tc.get("id") for tc in m.get("tool_calls", []) if tc.get("id")}
+                cleaned.append(m)
+            elif role == "tool":
+                if m.get("tool_call_id") in valid_ids:
+                    cleaned.append(m)
+                # else: 孤儿 tool 消息，丢弃
+            else:
+                cleaned.append(m)
+        self.messages = cleaned
+
     def to_messages(self) -> list[dict]:
+        self.sanitize()
         return list(self.messages)
 
     def save(self) -> None:

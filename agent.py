@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Callable
@@ -36,11 +37,12 @@ def build_system_prompt(skills: list[Skill], file_index: str = "") -> str:
 class Agent:
     def __init__(self, config: LLMConfig, sandbox_root: Path,
                  confirm: Callable[[str], bool], strong_confirm: Callable[[str], bool],
-                 persist: bool = True):
+                 persist: bool = True, max_tool_rounds: int = 100):
         sandbox_root.mkdir(parents=True, exist_ok=True)
         self.config = config
         self.llm = LLMClient(config)
-        self.gate = PermissionGate(sandbox_root, ("ls", "python3", "ffmpeg", "cat", "git"), confirm, strong_confirm)
+        self.max_tool_rounds = max_tool_rounds
+        self.gate = PermissionGate(sandbox_root, ("ls", "python3", "pip", "pip3", "ffmpeg", "cat", "git"), confirm, strong_confirm)
         self.registry = Registry()
         for t in (make_files_tools(self.gate) + make_spreadsheet_tools(self.gate)
                   + make_shell_tools(self.gate) + make_search_tools()
@@ -78,7 +80,7 @@ class Agent:
     def run(self, user_input: str) -> str:
         self.session.add("user", user_input)
         model = self._route_model(user_input)
-        for _ in range(20):  # 最多 20 轮工具调用
+        for _ in range(self.max_tool_rounds):  # 工具调用轮数上限（可配，默认 100）
             self.session.maybe_compress(self._summarize, max_tokens=self.max_tokens)
             result = self.llm.chat(self.session.to_messages(), self.registry.schemas(), model=model)
             if result.tool_calls:
@@ -100,7 +102,7 @@ class Agent:
                 self.session.save()
                 return result.content
             return "（无输出）"
-        return "（达到最大工具轮数）"
+        return f"（达到最大工具轮数 {self.max_tool_rounds}）"
 
 
 def _prompt(text: str) -> str:
@@ -175,6 +177,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
     cfg = load_llm_config()
+    try:
+        max_tool_rounds = int(os.getenv("MAX_TOOL_ROUNDS", "100"))
+    except ValueError:
+        max_tool_rounds = 100
     auto_yes = "--yes" in args or "-y" in args
     args = [a for a in args if a not in ("--yes", "-y")]
 
@@ -189,7 +195,7 @@ if __name__ == "__main__":
         strong_confirm = _confirmer.strong_confirm
 
     agent = Agent(cfg, Path("workspace"), confirm=confirm, strong_confirm=strong_confirm,
-                  persist=not bool(args))
+                  persist=not bool(args), max_tool_rounds=max_tool_rounds)
 
     if args:
         print(agent.run(" ".join(args)), flush=True)

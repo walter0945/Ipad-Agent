@@ -23,18 +23,20 @@ def make_shell_tools(gate) -> list[Tool]:
         return "\n".join(outputs).strip() or "（无输出）"
 
     def run_python(args):
-        if not gate.python(args["code"]):
+        code = args.get("code", "")
+        path = gate.sandbox_root / "agent_main.py"
+        if code.strip():
+            # 覆盖写入持久文件（记住上次代码，供后续增量编辑）
+            path.write_text(code, encoding="utf-8")
+        elif not path.exists():
+            return "没有已保存的代码：请先传 code 写入 agent_main.py，或确认该文件存在"
+        if not gate.python(path.read_text(encoding="utf-8")):
             return "拒绝：代码触碰密钥/越界，或未确认执行"
-        tmp = gate.sandbox_root / ".agent_tmp.py"
-        tmp.write_text(args["code"], encoding="utf-8")
-        try:
-            r = subprocess.run([sys.executable, tmp.name], capture_output=True, text=True,
-                               cwd=str(gate.sandbox_root), timeout=60)
-            return ((r.stdout or "") + (r.stderr or "")).strip() or "（无输出）"
-        finally:
-            tmp.unlink(missing_ok=True)
+        r = subprocess.run([sys.executable, path.name], capture_output=True, text=True,
+                           cwd=str(gate.sandbox_root), timeout=120)
+        return ((r.stdout or "") + (r.stderr or "")).strip() or "（无输出）"
 
     return [Tool("run_shell", "执行 shell 命令（白名单 + 确认）",
                  {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}, run_shell),
-            Tool("run_python", "执行一段 Python 代码（写临时文件运行，返回输出，适合写代码→跑→看结果）",
-                 {"type": "object", "properties": {"code": {"type": "string"}}, "required": ["code"]}, run_python)]
+            Tool("run_python", "执行 Python：传 code 覆盖保存到 agent_main.py 并运行；不传 code 则重跑已保存的 agent_main.py（配合 edit_file 增量改）",
+                 {"type": "object", "properties": {"code": {"type": "string"}}, "required": []}, run_python)]

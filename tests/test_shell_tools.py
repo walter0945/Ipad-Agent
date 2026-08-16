@@ -32,6 +32,24 @@ class TestShell(unittest.TestCase):
             out = tool.func({"code": "print('hello from python')"})
             self.assertIn("hello from python", out)
 
+    def test_run_python_persists_and_reruns(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            gate = PermissionGate(Path(d), ("python3",), lambda m: True, lambda m: True)
+            tool = {t.name: t for t in make_shell_tools(gate)}["run_python"]
+            tool.func({"code": "x = 42\nprint(x)"})
+            self.assertTrue((Path(d) / "agent_main.py").exists())
+            out = tool.func({})   # 不传 code，重跑已保存文件
+            self.assertIn("42", out)
+
+    def test_run_python_no_code_no_file(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            gate = PermissionGate(Path(d), ("python3",), lambda m: True, lambda m: True)
+            tool = {t.name: t for t in make_shell_tools(gate)}["run_python"]
+            out = tool.func({})
+            self.assertIn("没有已保存的代码", out)
+
     def test_run_python_blocks_sandbox_escape(self):
         import tempfile
         with tempfile.TemporaryDirectory() as d:

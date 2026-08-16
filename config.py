@@ -18,6 +18,7 @@ PROVIDER_PRESETS = {
     "grok": {"base_url": "https://api.x.ai/v1", "model": "grok-4"},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-5-codex"},
     "openrouter": {"base_url": "https://openrouter.ai/api/v1", "model": "anthropic/claude-sonnet-4-5"},
+    # anthropic 需走其 OpenAI 兼容端点，默认值仅供参考
     "anthropic": {"base_url": "https://api.anthropic.com", "model": "claude-sonnet-4-5"},
 }
 
@@ -30,6 +31,8 @@ def load_llm_config(env: Mapping | None = None) -> LLMConfig:
         raise ConfigError(f"未知 provider: {provider}，且未提供 LLM_BASE_URL")
     base_url = (env.get("LLM_BASE_URL") or (preset["base_url"] if preset else "")).rstrip("/")
     model = env.get("LLM_MODEL") or (preset["model"] if preset else "")
+    if not model:
+        raise ConfigError("使用自定义 LLM_BASE_URL 时必须提供 LLM_MODEL")
     api_key = env.get("LLM_API_KEY", "")
     if not api_key:
         raise ConfigError("缺少 LLM_API_KEY")

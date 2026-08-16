@@ -2,7 +2,7 @@ import re
 import subprocess
 from tools import Tool
 
-BLOCKED = re.compile(r"[|`&]|\$\(")
+BLOCKED = re.compile(r"(?<![|])\|(?![|])|(?<![&])&(?![&])|\$\(|`")
 
 def split_commands(command: str) -> list[str]:
     return [c.strip() for c in re.split(r"&&|\|\||;", command) if c.strip()]

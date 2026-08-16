@@ -8,8 +8,13 @@ class Session:
         self.messages = [{"role": "system", "content": system_prompt}]
         self.dirty = False
 
-    def add(self, role: str, content: str) -> None:
-        self.messages.append({"role": role, "content": content})
+    def add(self, role: str, content: str, tool_calls=None, tool_call_id=None) -> None:
+        msg = {"role": role, "content": content}
+        if tool_calls:
+            msg["tool_calls"] = tool_calls
+        if tool_call_id:
+            msg["tool_call_id"] = tool_call_id
+        self.messages.append(msg)
         self.dirty = True
 
     def to_messages(self) -> list[dict]:

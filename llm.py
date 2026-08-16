@@ -58,6 +58,8 @@ class LLMClient:
                 import certifi
                 resp = requests.post(url, headers=headers, json=payload,
                                      timeout=self.timeout, verify=certifi.where())
+                if resp.status_code == 401:
+                    raise LLMAuthError("401：API key 无效或余额不足")
                 resp.raise_for_status()
                 data = resp.json()
                 msg = data["choices"][0]["message"]

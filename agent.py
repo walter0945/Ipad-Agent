@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 from typing import Callable
-from config import LLMConfig
+from dotenv import load_dotenv
+from rich.console import Console
+from config import LLMConfig, load_llm_config
 from llm import LLMClient
 from permissions import PermissionGate
 from session import Session
@@ -34,24 +36,40 @@ class Agent:
         for t in (make_files_tools(self.gate) + make_spreadsheet_tools(self.gate)
                   + make_shell_tools(self.gate) + make_search_tools()):
             self.registry.register(t)
-        self.skills = load_skills(Path("skills"))
+        self.skills = load_skills(Path(__file__).resolve().parent / "skills")
+        self.max_tokens = 8192
         self.session_path = sandbox_root / ".session.jsonl"
         if self.session_path.exists():
             self.session = Session.load(self.session_path)
         else:
             self.session = Session(build_system_prompt(self.skills), self.session_path)
 
+    def _summarize(self, text: str) -> str:
+        try:
+            r = self.llm.chat([{"role": "system", "content": "把以下对话压缩成要点摘要，保留关键事实"},
+                               {"role": "user", "content": text}])
+            return r.content or ""
+        except Exception:  # noqa: BLE001
+            return ""
+
     def run(self, user_input: str) -> str:
         self.session.add("user", user_input)
         for _ in range(20):  # 最多 20 轮工具调用
+            self.session.maybe_compress(self._summarize, max_tokens=self.max_tokens)
             result = self.llm.chat(self.session.to_messages(), self.registry.schemas())
             if result.tool_calls:
+                self.session.add("assistant", result.content or "",
+                                 tool_calls=[{"id": tc.id, "type": "function",
+                                              "function": {"name": tc.name,
+                                                           "arguments": json.dumps(tc.arguments, ensure_ascii=False)}}
+                                             for tc in result.tool_calls])
                 for tc in result.tool_calls:
                     try:
                         out = self.registry.run(tc.name, tc.arguments)
                     except Exception as e:  # noqa: BLE001
                         out = f"工具执行出错：{e}"
-                    self.session.add("tool", f"[{tc.name}] {out}")
+                    self.session.add("tool", f"[{tc.name}] {out}", tool_call_id=tc.id)
+                    self.session.save()
                 continue
             if result.content:
                 self.session.add("assistant", result.content)
@@ -59,3 +77,20 @@ class Agent:
                 return result.content
             return "（无输出）"
         return "（达到最大工具轮数）"
+
+
+def _ask(prompt: str) -> bool:
+    return input(prompt).strip().lower() in ("y", "yes", "是")
+
+
+if __name__ == "__main__":
+    load_dotenv()
+    cfg = load_llm_config()
+    agent = Agent(cfg, Path("workspace"), confirm=_ask, strong_confirm=_ask)
+    console = Console()
+    print("输入 /quit 或 /exit 退出。")
+    while True:
+        u = input("你 > ")
+        if u.strip().lower() in ("/quit", "/exit"):
+            break
+        console.print(agent.run(u))

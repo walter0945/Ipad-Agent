@@ -24,5 +24,16 @@ class TestLoadLLMConfig(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_llm_config({"LLM_API_KEY": "k", "PROVIDER": "nope"})
 
+    def test_custom_base_url_requires_model(self):
+        with self.assertRaises(ConfigError) as cm:
+            load_llm_config({"LLM_API_KEY": "k", "PROVIDER": "custom",
+                             "LLM_BASE_URL": "http://localhost:11434/v1"})
+        self.assertIn("LLM_MODEL", str(cm.exception))
+
+    def test_custom_base_url_with_model_ok(self):
+        c = load_llm_config({"LLM_API_KEY": "k", "PROVIDER": "custom",
+                             "LLM_BASE_URL": "http://localhost:11434/v1", "LLM_MODEL": "llama3"})
+        self.assertEqual(c.model, "llama3")
+
 if __name__ == "__main__":
     unittest.main()

@@ -17,5 +17,12 @@ class TestShell(unittest.TestCase):
         tool = {t.name: t for t in make_shell_tools(gate)}["run_shell"]
         self.assertIn("hi", tool.func({"command": "echo hi"}))
 
+    def test_run_and_chain(self):
+        gate = PermissionGate(Path("workspace"), ("echo",), lambda m: True, lambda m: True)
+        tool = {t.name: t for t in make_shell_tools(gate)}["run_shell"]
+        out = tool.func({"command": "echo a && echo b"})
+        self.assertIn("a", out)
+        self.assertIn("b", out)
+
 if __name__ == "__main__":
     unittest.main()

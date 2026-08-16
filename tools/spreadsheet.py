@@ -1,15 +1,39 @@
 import csv
+import re
 from pathlib import Path
 from tools import Tool
 from openpyxl import load_workbook, Workbook
 
 def _resolve(gate, p): return gate.sandbox_root.joinpath(p).resolve()
 
+def _infer_col_type(values) -> str:
+    """对一列前几行数据做简单类型推断：int/float/str。"""
+    kinds = set()
+    for v in values:
+        s = str(v).strip()
+        if not s:
+            continue
+        if re.fullmatch(r"[+-]?\d+", s):
+            kinds.add("int")
+        else:
+            try:
+                float(s)
+                kinds.add("float")
+            except ValueError:
+                kinds.add("str")
+    if not kinds or "str" in kinds:
+        return "str"
+    if kinds == {"int"}:
+        return "int"
+    return "float"
+
 def make_spreadsheet_tools(gate) -> list[Tool]:
     def sheet_list(args):
         root = _resolve(gate, ".")
+        if not gate.read(root):
+            return "拒绝"
         files = [str(x.relative_to(gate.sandbox_root)) for x in root.glob("*")
-                 if x.suffix.lower() in (".xlsx", ".csv")]
+                 if x.suffix.lower() in (".xlsx", ".csv") and not gate._is_secret(x)]
         return "\n".join(sorted(files)) or "（无表格文件）"
 
     def _read_xlsx(path, sheet=None):
@@ -28,7 +52,10 @@ def make_spreadsheet_tools(gate) -> list[Tool]:
 
     def sheet_write_cell(args):
         p = _resolve(gate, args["path"])
-        if not gate.write(p): return "拒绝"
+        if p.exists():
+            if not gate.overwrite(p): return "拒绝"
+        elif not gate.write(p):
+            return "拒绝"
         if not p.exists():
             Workbook().save(p)
         wb = load_workbook(p)
@@ -39,7 +66,10 @@ def make_spreadsheet_tools(gate) -> list[Tool]:
 
     def sheet_add_row(args):
         p = _resolve(gate, args["path"])
-        if not gate.write(p): return "拒绝"
+        if p.exists():
+            if not gate.overwrite(p): return "拒绝"
+        elif not gate.write(p):
+            return "拒绝"
         wb = load_workbook(p) if p.exists() else Workbook()
         ws = wb[args.get("sheet", wb.sheetnames[0])] if args.get("sheet") in wb.sheetnames else wb.create_sheet(args.get("sheet", "Sheet1"))
         ws.append(args["row"])
@@ -53,7 +83,16 @@ def make_spreadsheet_tools(gate) -> list[Tool]:
         lines = [f"工作表: {', '.join(wb.sheetnames)}"]
         for name in wb.sheetnames:
             ws = wb[name]
+            rows = list(ws.iter_rows(values_only=True))
+            headers = ["" if c is None else str(c) for c in (rows[0] if rows else ())]
+            data_rows = rows[1:6]  # 前 5 行数据做类型推断
+            inferred = []
+            for col_idx in range(len(headers)):
+                vals = [r[col_idx] for r in data_rows if col_idx < len(r) and r[col_idx] is not None]
+                inferred.append(_infer_col_type(vals))
+            cols = ", ".join(f"{h}({t})" for h, t in zip(headers, inferred)) or "（无列）"
             lines.append(f"- {name}: {ws.max_row} 行 x {ws.max_column} 列")
+            lines.append(f"  列: {cols}")
         wb.close()
         return "\n".join(lines)
 

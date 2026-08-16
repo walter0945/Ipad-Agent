@@ -354,7 +354,7 @@ class TestGate(unittest.TestCase):
 
     def test_delete_requires_strong_confirm(self):
         seen = {}
-        g = self._gate(strong=lambda m: seen.setdefault("strong", True) or False)
+        g = self._gate(strong=lambda m: seen.setdefault("strong", True) and False)
         self.assertFalse(g.delete(Path("workspace/b.txt")))
         self.assertIn("strong", seen)
 

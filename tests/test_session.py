@@ -92,6 +92,20 @@ class TestSession(unittest.TestCase):
         s.add("tool", "rb", tool_call_id="b")
         self.assertEqual(len([m for m in s.to_messages() if m.get("role") == "tool"]), 2)
 
+    def test_sanitize_drops_incomplete_tool_group(self):
+        # assistant.tool_calls 有 2 个工具调用，但只回了 1 个 → 半截组，应整组丢弃
+        s = Session("sys")
+        s.add("assistant", "", tool_calls=[
+            {"id": "a", "type": "function", "function": {"name": "x", "arguments": "{}"}},
+            {"id": "b", "type": "function", "function": {"name": "y", "arguments": "{}"}},
+        ])
+        s.add("tool", "ra", tool_call_id="a")   # 缺 b
+        s.add("assistant", "最终答复")
+        msgs = s.to_messages()
+        self.assertFalse(any(m.get("tool_calls") for m in msgs))
+        self.assertFalse(any(m.get("role") == "tool" for m in msgs))
+        self.assertEqual(msgs[-1], {"role": "assistant", "content": "最终答复"})
+
     def test_roundtrip_with_tool_fields(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "s.jsonl"

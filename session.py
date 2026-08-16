@@ -18,14 +18,20 @@ class Session:
         self.dirty = True
 
     def sanitize(self) -> None:
-        """丢弃孤儿 tool 消息：tool_call_id 不在前一个 assistant 的 tool_calls 里。
+        """发送前最后一道防线：保证消息序列对 OpenAI 协议合法，避免 400。
 
-        这是发送前的最后一道防线——无论压缩/加载历史/边界情况如何，
-        都能保证发给 API 的消息序列合法，避免 400 (missing tool_call_id)。
+        分两遍：
+        1) 丢弃孤儿 tool 消息（tool_call_id 无对应 assistant.tool_calls）
+        2) 丢弃未被完整回应的 assistant.tool_calls 组（tool_calls 数量 > 后续 tool 结果数量）
         """
+        self.messages = self._drop_orphan_tools(self.messages)
+        self.messages = self._drop_incomplete_groups(self.messages)
+
+    @staticmethod
+    def _drop_orphan_tools(msgs: list) -> list:
         valid_ids: set = set()
         cleaned: list = []
-        for m in self.messages:
+        for m in msgs:
             role = m.get("role")
             if role == "assistant":
                 valid_ids = {tc.get("id") for tc in m.get("tool_calls", []) if tc.get("id")}
@@ -36,7 +42,31 @@ class Session:
                 # else: 孤儿 tool 消息，丢弃
             else:
                 cleaned.append(m)
-        self.messages = cleaned
+        return cleaned
+
+    @staticmethod
+    def _drop_incomplete_groups(msgs: list) -> list:
+        result: list = []
+        i = 0
+        n = len(msgs)
+        while i < n:
+            m = msgs[i]
+            if m.get("role") == "assistant" and m.get("tool_calls"):
+                ids = [tc.get("id") for tc in m["tool_calls"] if tc.get("id")]
+                j = i + 1
+                tool_ids = []
+                while j < n and msgs[j].get("role") == "tool":
+                    tool_ids.append(msgs[j].get("tool_call_id"))
+                    j += 1
+                # 只有每个 tool_call_id 都恰好有一个 tool 结果时才保留整组
+                if len(tool_ids) == len(ids) and set(tool_ids) == set(ids):
+                    result.extend(msgs[i:j])
+                # else: 半截组，整组丢弃
+                i = j
+            else:
+                result.append(m)
+                i += 1
+        return result
 
     def to_messages(self) -> list[dict]:
         self.sanitize()

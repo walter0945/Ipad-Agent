@@ -38,7 +38,7 @@ class Agent:
         sandbox_root.mkdir(parents=True, exist_ok=True)
         self.config = config
         self.llm = LLMClient(config)
-        self.gate = PermissionGate(sandbox_root, ("ls", "python3", "ffmpeg", "cat"), confirm, strong_confirm)
+        self.gate = PermissionGate(sandbox_root, ("ls", "python3", "ffmpeg", "cat", "git"), confirm, strong_confirm)
         self.registry = Registry()
         for t in (make_files_tools(self.gate) + make_spreadsheet_tools(self.gate)
                   + make_shell_tools(self.gate) + make_search_tools()

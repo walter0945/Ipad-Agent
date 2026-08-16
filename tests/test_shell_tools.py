@@ -24,5 +24,13 @@ class TestShell(unittest.TestCase):
         self.assertIn("a", out)
         self.assertIn("b", out)
 
+    def test_run_python(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            gate = PermissionGate(Path(d), ("python3",), lambda m: True, lambda m: True)
+            tool = {t.name: t for t in make_shell_tools(gate)}["run_python"]
+            out = tool.func({"code": "print('hello from python')"})
+            self.assertIn("hello from python", out)
+
 if __name__ == "__main__":
     unittest.main()

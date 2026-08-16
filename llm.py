@@ -25,8 +25,9 @@ class LLMClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
-    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResult:
-        payload = {"model": self.config.model, "messages": messages}
+    def chat(self, messages: list[dict], tools: list[dict] | None = None,
+             model: str | None = None) -> LLMResult:
+        payload = {"model": model or self.config.model, "messages": messages}
         if tools:
             payload["tools"] = tools
         headers = {"Authorization": f"Bearer {self.config.api_key}"}

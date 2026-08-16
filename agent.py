@@ -8,6 +8,7 @@ from llm import LLMClient
 from permissions import PermissionGate
 from session import Session
 from skills import Skill, load_skills
+from router import should_use_reasoner
 from tools import Registry
 from tools.files import make_files_tools
 from tools.spreadsheet import make_spreadsheet_tools
@@ -30,6 +31,7 @@ class Agent:
     def __init__(self, config: LLMConfig, sandbox_root: Path,
                  confirm: Callable[[str], bool], strong_confirm: Callable[[str], bool]):
         sandbox_root.mkdir(parents=True, exist_ok=True)
+        self.config = config
         self.llm = LLMClient(config)
         self.gate = PermissionGate(sandbox_root, ("ls", "python3", "ffmpeg", "cat"), confirm, strong_confirm)
         self.registry = Registry()
@@ -52,11 +54,18 @@ class Agent:
         except Exception:  # noqa: BLE001
             return ""
 
+    def _route_model(self, user_input: str) -> str | None:
+        # None 表示用默认 chat 模型；命中的话用 provider 的 reasoner 模型
+        if should_use_reasoner(user_input) and self.config.reasoner_model:
+            return self.config.reasoner_model
+        return None
+
     def run(self, user_input: str) -> str:
         self.session.add("user", user_input)
+        model = self._route_model(user_input)
         for _ in range(20):  # 最多 20 轮工具调用
             self.session.maybe_compress(self._summarize, max_tokens=self.max_tokens)
-            result = self.llm.chat(self.session.to_messages(), self.registry.schemas())
+            result = self.llm.chat(self.session.to_messages(), self.registry.schemas(), model=model)
             if result.tool_calls:
                 self.session.add("assistant", result.content or "",
                                  tool_calls=[{"id": tc.id, "type": "function",

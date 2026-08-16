@@ -4,12 +4,20 @@ from config import load_llm_config, LLMConfig, ConfigError
 class TestLoadLLMConfig(unittest.TestCase):
     def test_deepseek_preset(self):
         c = load_llm_config({"LLM_API_KEY": "sk-1"})
-        self.assertEqual(c, LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-chat"))
+        self.assertEqual(c, LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-chat", "deepseek-reasoner"))
 
     def test_qwen_preset(self):
         c = load_llm_config({"LLM_API_KEY": "sk-2", "PROVIDER": "qwen"})
         self.assertEqual(c.base_url, "https://dashscope.aliyuncs.com/compatible-mode/v1")
         self.assertEqual(c.model, "qwen-plus")
+
+    def test_qwen_no_reasoner(self):
+        c = load_llm_config({"LLM_API_KEY": "sk-2", "PROVIDER": "qwen"})
+        self.assertEqual(c.reasoner_model, "")
+
+    def test_reasoner_override(self):
+        c = load_llm_config({"LLM_API_KEY": "k", "LLM_REASONER_MODEL": "my-reasoner"})
+        self.assertEqual(c.reasoner_model, "my-reasoner")
 
     def test_override(self):
         c = load_llm_config({"LLM_API_KEY": "k", "LLM_BASE_URL": "http://localhost:11434/v1", "LLM_MODEL": "llama3"})

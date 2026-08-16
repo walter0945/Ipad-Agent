@@ -22,7 +22,7 @@ class TestAgent(unittest.TestCase):
 
 class _FakeLLM:
     def __init__(self): self.n = 0
-    def chat(self, messages, tools=None):
+    def chat(self, messages, tools=None, model=None):
         self.n += 1
         if self.n == 1:
             return LLMResult(None, [ToolCall("t1", "write_file", {"path": "a.txt", "content": "hi"})])

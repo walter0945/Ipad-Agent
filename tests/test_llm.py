@@ -3,14 +3,27 @@ import json, unittest
 from unittest.mock import patch, MagicMock
 import requests
 from config import LLMConfig
-from llm import LLMClient, LLMResult, ToolCall, LLMAuthError, LLMRateLimitError
+from llm import LLMClient, LLMResult, ToolCall, LLMAuthError, LLMRateLimitError, LLMError
 
 CFG = LLMConfig("deepseek", "https://api.deepseek.com", "sk-1", "deepseek-chat")
 
 class TestChat(unittest.TestCase):
     def _resp(self, payload):
-        m = MagicMock(); m.raise_for_status.return_value = None; m.json.return_value = payload
+        m = MagicMock()
+        m.status_code = 200
+        m.raise_for_status.return_value = None
+        m.json.return_value = payload
         return m
+
+    def test_400_includes_body(self):
+        resp = self._resp({"error": {"message": "missing field tool_call_id"}})
+        resp.status_code = 400
+        resp.text = '{"error":{"message":"missing field tool_call_id"}}'
+        with patch("llm.requests.post") as post:
+            post.return_value = resp
+            with self.assertRaises(LLMError) as cm:
+                LLMClient(CFG).chat([{"role": "user", "content": "x"}])
+        self.assertIn("tool_call_id", str(cm.exception))
 
     def test_content_only(self):
         with patch("llm.requests.post") as post:

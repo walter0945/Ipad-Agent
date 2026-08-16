@@ -25,6 +25,17 @@ class LLMClient:
         self.timeout = timeout
         self.max_retries = max_retries
 
+    def _error_detail(self, resp) -> str:
+        try:
+            body = resp.json()
+            if isinstance(body, dict):
+                err = body.get("error")
+                if isinstance(err, dict) and err.get("message"):
+                    return str(err["message"])
+        except Exception:  # noqa: BLE001
+            pass
+        return (resp.text or "")[:300] or "(无正文)"
+
     def chat(self, messages: list[dict], tools: list[dict] | None = None,
              model: str | None = None) -> LLMResult:
         payload = {"model": model or self.config.model, "messages": messages}
@@ -38,7 +49,10 @@ class LLMClient:
                 resp = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
                 if resp.status_code == 401:
                     raise LLMAuthError("401：API key 无效或余额不足")
-                resp.raise_for_status()
+                if resp.status_code == 429 or resp.status_code >= 500:
+                    resp.raise_for_status()   # 触发 HTTPError 分支进行重试
+                if resp.status_code >= 400:
+                    raise LLMError(f"HTTP {resp.status_code}: {self._error_detail(resp)}")
                 data = resp.json()
                 msg = data["choices"][0]["message"]
                 calls = [ToolCall(tc["id"], tc["function"]["name"],
@@ -62,7 +76,8 @@ class LLMClient:
                                      timeout=self.timeout, verify=certifi.where())
                 if resp.status_code == 401:
                     raise LLMAuthError("401：API key 无效或余额不足")
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    raise LLMError(f"HTTP {resp.status_code}: {self._error_detail(resp)}")
                 data = resp.json()
                 msg = data["choices"][0]["message"]
                 calls = [ToolCall(tc["id"], tc["function"]["name"],

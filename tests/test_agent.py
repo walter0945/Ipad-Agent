@@ -24,12 +24,15 @@ class TestAgent(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            (root / ".session.jsonl").write_text(
-                '{"role": "system", "content": "OLD"}\n', encoding="utf-8")
+            sf = root / ".session.jsonl"
+            sf.write_text('{"role": "system", "content": "OLD"}\n', encoding="utf-8")
             cfg = LLMConfig("deepseek", "http://x", "k", "m")
             agent = Agent(cfg, root, lambda m: True, lambda m: True, persist=False)
+            # 不加载旧会话
             self.assertTrue(all("OLD" not in m["content"] for m in agent.session.to_messages()))
-            self.assertFalse((root / ".session.jsonl").exists())
+            # 保存是 no-op：旧文件内容不变
+            agent.session.save()
+            self.assertEqual(sf.read_text(encoding="utf-8"), '{"role": "system", "content": "OLD"}\n')
 
 class _FakeLLM:
     def __init__(self): self.n = 0

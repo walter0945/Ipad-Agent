@@ -72,6 +72,22 @@ def make_files_tools(gate) -> list[Tool]:
                          if not gate._is_secret(x))
         return "\n".join(matches[:100])
 
+    def delete_file(args):
+        p = _resolve(gate, args["path"])
+        if not gate.delete(p):
+            return "拒绝：未确认删除或路径越界"
+        if p.is_dir():
+            try:
+                p.rmdir()
+                return f"已删除空目录 {args['path']}"
+            except OSError as e:
+                return f"删除失败：{e}（目录可能非空）"
+        try:
+            p.unlink()
+            return f"已删除 {args['path']}"
+        except FileNotFoundError:
+            return f"文件不存在：{args['path']}"
+
     def file_index(args):
         return build_index(gate.sandbox_root)
 
@@ -86,4 +102,5 @@ def make_files_tools(gate) -> list[Tool]:
         Tool("grep", "正则搜索文件内容", {"type": "object", "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}}, "required": ["pattern"]}, grep),
         Tool("glob", "按模式找文件", {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}, glob),
         Tool("file_index", "列出沙盒内所有文件（排除隐藏与密钥文件）", {"type": "object", "properties": {}, "required": []}, file_index),
+        Tool("delete_file", "删除文件或空目录（需强确认）", {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}, delete_file),
     ]

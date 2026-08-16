@@ -88,5 +88,24 @@ class TestFileTools(unittest.TestCase):
             out = t["read_file"].func({"path": "a.txt", "start": 0})
             self.assertIn("l1", out)
 
+    def test_delete_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            t = _tools(root)
+            t["write_file"].func({"path": "a.txt", "content": "x"})
+            out = t["delete_file"].func({"path": "a.txt"})
+            self.assertIn("已删除", out)
+            self.assertFalse((root / "a.txt").exists())
+
+    def test_delete_requires_strong_confirm(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.txt").write_text("x", encoding="utf-8")
+            gate = PermissionGate(root, (), lambda m: True, lambda m: False)
+            t = {tool.name: tool for tool in make_files_tools(gate)}
+            out = t["delete_file"].func({"path": "a.txt"})
+            self.assertIn("拒绝", out)
+            self.assertTrue((root / "a.txt").exists())
+
 if __name__ == "__main__":
     unittest.main()
